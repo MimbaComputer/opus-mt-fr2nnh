@@ -14,7 +14,11 @@ const inputText = document.getElementById('inputText');
 const historyList = document.getElementById('historyList');
 
 // Configuration du modèle
+<<<<<<< HEAD
 const modelID = "opus-mt-fr2nnh";
+=======
+const modelID = "Xenova/opus-mt-en-fr";
+>>>>>>> d465bf8feff927e5121f4e35ad327ab579f52659
 const modelTask = "translation";
 let translator = null;
 

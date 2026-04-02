@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Traducteur FR-NNH | Ngiemboon</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* En-tête */
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .author {
+            font-size: 0.9rem;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        /* Layout principal */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 25px;
+        }
+
+        /* Panneau gauche */
+        .translation-panel {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .panel-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            font-size: 1rem;
+            font-family: inherit;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            flex: 2;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102,126,234,0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            flex: 1;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 10px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .result-text {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #333;
+            word-wrap: break-word;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        /* Panneau droit - Historique */
+        .history-panel {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            height: fit-content;
+            max-height: 80vh;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .history-header h3 {
+            font-size: 1.2rem;
+            color: #333;
+        }
+
+        .btn-clear {
+            background: none;
+            color: #999;
+            font-size: 0.8rem;
+            padding: 5px 10px;
+        }
+
+        .btn-clear:hover {
+            color: #c62828;
+            background: none;
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 500px;
+        }
+
+        .history-item {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+
+        .history-item:hover {
+            background: #e9ecef;
+            transform: translateX(-2px);
+        }
+
+        .history-source {
+            font-size: 0.85rem;
+            color: #667eea;
+            font-weight: 500;
+            margin-bottom: 5px;
+            word-break: break-word;
+        }
+
+        .history-target {
+            font-size: 0.95rem;
+            color: #333;
+            margin-bottom: 8px;
+            word-break: break-word;
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .history-actions button {
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .history-actions button:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .history-empty {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: white;
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .history-panel {
+                max-height: 400px;
+            }
+            
+            .header h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌍 Traducteur Français ↔ Ngiemboon (nnh)</h1>
+            <p>Traduction automatique de qualité avec intelligence artificielle</p>
+            <div class="author">Développé par <strong>Mimba Ngouana Fofou</strong> &copy; 2026</div>
+        </div>
+
+        <div class="main-content">
+            <!-- Panneau gauche : Traduction -->
+            <div class="translation-panel">
+                <div class="panel-title">📝 Texte source</div>
+                <textarea id="inputText" placeholder="Entrez votre texte en français ici..."></textarea>
+                
+                <div class="button-group">
+                    <button id="translateBtn" class="btn-primary" disabled>✨ Traduire</button>
+                    <button id="clearBtn" class="btn-secondary">🗑️ Effacer</button>
+                </div>
+
+                <div class="panel-title">🎯 Traduction</div>
+                <div class="result-box">
+                    <div class="result-label">Résultat :</div>
+                    <div id="output" class="result-text">En attente de traduction...</div>
+                    <button id="copyResultBtn" class="btn-secondary" style="margin-top: 15px; width: 100%;" disabled>📋 Copier le résultat</button>
+                </div>
+
+                <div id="status" class="status loading">⚙️ Chargement du modèle en cours...</div>
+            </div>
+
+            <!-- Panneau droit : Historique -->
+            <div class="history-panel">
+                <div class="history-header">
+                    <h3>📜 Historique des traductions</h3>
+                    <button id="clearHistoryBtn" class="btn-clear">🗑️ Tout effacer</button>
+                </div>
+                <div id="historyList" class="history-list">
+                    <div class="history-empty">Aucune traduction pour le moment</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>💡 Astuce : Cliquez sur une traduction dans l'historique pour la recopier dans le champ source | Double-cliquez sur le résultat pour le copier</p>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>

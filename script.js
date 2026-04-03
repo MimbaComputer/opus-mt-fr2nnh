@@ -1,7 +1,7 @@
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
 
 // Configuration
-env.allowRemoteModels = false;
+//env.allowRemoteModels = false;
 
 // Éléments DOM
 const status = document.getElementById('status');
@@ -142,7 +142,8 @@ async function init() {
         status.textContent = "⚙️ Chargement du modèle de traduction...";
         status.className = "status loading";
         
-        translator = await pipeline(modelTask, modelID, { local_files_only: true });
+        translator = await pipeline(modelTask, modelID);
+        //translator = await pipeline(modelTask, modelID, { local_files_only: true });
         
         status.textContent = "✅ Modèle prêt !";
         status.className = "status success";

@@ -14,11 +14,7 @@ const inputText = document.getElementById('inputText');
 const historyList = document.getElementById('historyList');
 
 // Configuration du modèle
-<<<<<<< HEAD
-const modelID = "opus-mt-fr2nnh";
-=======
-const modelID = "Xenova/opus-mt-en-fr";
->>>>>>> d465bf8feff927e5121f4e35ad327ab579f52659
+const modelID = "Xenova/opus-mt-fr-en";
 const modelTask = "translation";
 let translator = null;
 
@@ -197,8 +193,18 @@ async function translate() {
                          result?.[0]?.text?.trim() ??
                          "";
         
-        // Nettoyer les tokens spéciaux si présents
-        translation = translation.replace(/__nnh__/g, '').trim();
+        // Nettoyage amélioré
+        translation = translation
+            .replace(/__nnh__/g, '')  // Enlever les marqueurs de langue
+            .replace(/^,\s*/, '')      // Enlever la virgule au début
+            .replace(/^\s+/, '')       // Enlever les espaces au début
+            .replace(/^[，,]\s*/, '')  // Enlever virgule chinoise ou normale
+            .trim();
+        
+        // Si la traduction commence par un espace ou une virgule après nettoyage
+        if (translation.startsWith(',')) {
+            translation = translation.substring(1).trim();
+        }
         
         outputDiv.textContent = translation;
         

@@ -1,8 +1,8 @@
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
+import { pipeline, env } from '@xenova/transformers';
 
 // Configuration
 env.allowRemoteModels = true;
-env.cacheDir = './models';  // Dossier de cache personnalisé
+env.cacheDir = './models';
 
 // Éléments DOM
 const status = document.getElementById('status');
@@ -22,15 +22,32 @@ const MODEL_TASK = "translation";
 let translator = null;
 let isLoading = false;
 
+// Configuration de génération
+let generationConfig = {
+    num_beams: 4,
+    max_new_tokens: 512,
+    return_full_text: false,
+    early_stopping: false,
+    no_repeat_ngram_size: 0,
+    temperature: 1.0,
+    do_sample: false
+};
+
 // Stockage de l'historique
 let history = [];
-
-// Clé pour le localStorage
 const STORAGE_KEY = 'translation_history';
+
+// Éléments du panneau config
+const configToggle = document.getElementById('configToggle');
+const configDropdown = document.getElementById('configDropdown');
+const numBeamsSlider = document.getElementById('numBeamsSlider');
+const maxTokensSlider = document.getElementById('maxTokensSlider');
+const beamsValue = document.getElementById('beamsValue');
+const maxTokensValue = document.getElementById('maxTokensValue');
+const currentBeamsBadge = document.getElementById('currentBeamsBadge');
 
 // ---- Gestion du cache ----
 function getCacheSize() {
-    // Estimation approximative de la taille du cache
     if ('caches' in window) {
         return caches.keys().then(keys => {
             let totalSize = 0;
@@ -53,7 +70,6 @@ async function clearModelCache() {
         status.textContent = "🗑️ Nettoyage du cache en cours...";
         status.className = "status loading";
         
-        // Vider le cache du modèle dans les différents stockages
         if ('caches' in window) {
             const cacheKeys = await caches.keys();
             for (const key of cacheKeys) {
@@ -64,7 +80,6 @@ async function clearModelCache() {
             }
         }
         
-        // Nettoyer le localStorage du modèle
         for (const key in localStorage) {
             if (key.includes('transformers') || key.includes('model') || key.includes(MODEL_ID)) {
                 localStorage.removeItem(key);
@@ -72,7 +87,6 @@ async function clearModelCache() {
             }
         }
         
-        // Nettoyer sessionStorage
         for (const key in sessionStorage) {
             if (key.includes('transformers') || key.includes('model') || key.includes(MODEL_ID)) {
                 sessionStorage.removeItem(key);
@@ -104,23 +118,17 @@ async function reloadModel() {
     status.textContent = "🔄 Nettoyage du cache et rechargement du modèle...";
     status.className = "status loading";
     
-    // 1. Vider le cache
     const cacheCleared = await clearModelCache();
     
     if (cacheCleared) {
         status.textContent = "🗑️ Cache vidé, téléchargement du nouveau modèle...";
     }
     
-    // 2. Forcer le rechargement en ajoutant un timestamp
-    const reloadModelId = MODEL_ID; // + `?reload=${Date.now()}`;
-    
     try {
-        // Réinitialiser le pipeline
         translator = null;
         
-        // Recharger avec l'option de forcer le téléchargement
-        translator = await pipeline(MODEL_TASK, reloadModelId, {
-			local_files_only: false,
+        translator = await pipeline(MODEL_TASK, MODEL_ID, {
+            local_files_only: false,
             progress_callback: (progress) => {
                 if (progress.status === 'downloading') {
                     status.textContent = `📥 Téléchargement: ${Math.round(progress.progress * 100)}%`;
@@ -135,11 +143,6 @@ async function reloadModel() {
         translateBtn.disabled = false;
         copyResultBtn.disabled = false;
         
-        // Afficher les infos du modèle
-        const model = translator.model;
-        console.log("Config du modèle rechargé:", model.config);
-        
-        // Afficher le message de cache après 3 secondes
         setTimeout(() => {
             showCacheInfo();
         }, 3000);
@@ -167,7 +170,63 @@ async function showCacheInfo() {
     }
 }
 
-// ---- Gestion de l'historique (inchangée) ----
+// ---- Initialisation du panneau config ----
+function initConfigPanel() {
+    if (!configToggle || !configDropdown) return;
+    
+    configToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        configDropdown.classList.toggle('show');
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (!configDropdown.contains(e.target) && !configToggle.contains(e.target)) {
+            configDropdown.classList.remove('show');
+        }
+    });
+    
+    if (numBeamsSlider) {
+        numBeamsSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            beamsValue.textContent = value;
+            generationConfig.num_beams = value;
+            currentBeamsBadge.textContent = `${value} beam${value > 1 ? 's' : ''}`;
+            
+            const speedHint = value <= 2 ? '🚀 Mode rapide' : (value >= 6 ? '🐢 Mode précision' : '⚖️ Mode équilibré');
+            showTemporaryStatus(`${speedHint} : ${value} beam${value > 1 ? 's' : ''}`, 'success');
+            
+            localStorage.setItem('translation_num_beams', value);
+        });
+    }
+    
+    if (maxTokensSlider) {
+        maxTokensSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            maxTokensValue.textContent = value;
+            generationConfig.max_new_tokens = value;
+            localStorage.setItem('translation_max_tokens', value);
+        });
+    }
+    
+    const savedBeams = localStorage.getItem('translation_num_beams');
+    if (savedBeams && numBeamsSlider) {
+        const beams = parseInt(savedBeams);
+        numBeamsSlider.value = beams;
+        beamsValue.textContent = beams;
+        generationConfig.num_beams = beams;
+        currentBeamsBadge.textContent = `${beams} beam${beams > 1 ? 's' : ''}`;
+    }
+    
+    const savedTokens = localStorage.getItem('translation_max_tokens');
+    if (savedTokens && maxTokensSlider) {
+        const tokens = parseInt(savedTokens);
+        maxTokensSlider.value = tokens;
+        maxTokensValue.textContent = tokens;
+        generationConfig.max_new_tokens = tokens;
+    }
+}
+
+// ---- Gestion de l'historique ----
 function loadHistory() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -272,50 +331,6 @@ function showTemporaryStatus(message, type = 'info') {
     }, 2000);
 }
 
-// ---- Initialisation ----
-async function init() {
-    if (isLoading) return;
-    isLoading = true;
-    
-    try {
-        status.textContent = "⚙️ Chargement du modèle de traduction...";
-        status.className = "status loading";
-        
-        translator = await pipeline(MODEL_TASK, MODEL_ID, {
-            progress_callback: (progress) => {
-                if (progress.status === 'downloading') {
-                    status.textContent = `📥 Téléchargement: ${Math.round(progress.progress * 100)}%`;
-                } else if (progress.status === 'loading') {
-                    status.textContent = "⚙️ Chargement du modèle...";
-                }
-            }
-        });
-        
-        status.textContent = "✅ Modèle prêt !";
-        status.className = "status success";
-        translateBtn.disabled = false;
-        copyResultBtn.disabled = false;
-        reloadModelBtn.disabled = false;
-        
-        loadHistory();
-        
-        const model = translator.model;
-        console.log("Config du modèle:", model.config);
-        
-        setTimeout(() => {
-            showCacheInfo();
-        }, 2000);
-        
-    } catch (e) {
-        status.textContent = "❌ Erreur : " + e.message;
-        status.className = "status error";
-        console.error("Erreur détaillée :", e);
-        console.error("Stack:", e.stack);
-    } finally {
-        isLoading = false;
-    }
-}
-
 // ---- Traduction ----
 async function translate() {
     const text = inputText.value.trim();
@@ -330,15 +345,25 @@ async function translate() {
     }
     
     translateBtn.disabled = true;
-    outputDiv.textContent = "🔄 Traduction en cours...";
+    
+    const beamInfo = generationConfig.num_beams === 1 ? '⚡ greedy' : `🎯 ${generationConfig.num_beams} beams`;
+    outputDiv.textContent = `🔄 Traduction en cours (${beamInfo})...`;
     
     try {
+        const startTime = performance.now();
+        
         const result = await translator(text, {
-            max_new_tokens: 512,
-            return_full_text: true,
-            early_stopping: false,
-            no_repeat_ngram_size: 0
+            max_new_tokens: generationConfig.max_new_tokens,
+            num_beams: generationConfig.num_beams,
+            return_full_text: generationConfig.return_full_text,
+            early_stopping: generationConfig.early_stopping,
+            no_repeat_ngram_size: generationConfig.no_repeat_ngram_size,
+            temperature: generationConfig.temperature,
+            do_sample: generationConfig.do_sample
         });
+        
+        const endTime = performance.now();
+        const duration = ((endTime - startTime) / 1000).toFixed(2);
         
         let translation = result?.[0]?.generated_text?.trim() ??
                          result?.[0]?.translation_text?.trim() ??
@@ -358,7 +383,10 @@ async function translate() {
         
         outputDiv.textContent = translation;
         addToHistory(text, translation);
-        showTemporaryStatus("✅ Traduction terminée !", "success");
+        
+        showTemporaryStatus(`✅ Traduction en ${duration}s (${generationConfig.num_beams} beam${generationConfig.num_beams > 1 ? 's' : ''})`, "success");
+        
+        console.log(`Traduction: "${text.substring(0, 50)}..." → ${duration}s, ${generationConfig.num_beams} beams`);
         
     } catch (err) {
         outputDiv.textContent = "❌ Erreur lors de la traduction";
@@ -371,7 +399,7 @@ async function translate() {
 
 async function copyResult() {
     const resultText = outputDiv.textContent;
-    if (!resultText || resultText === "En attente de traduction..." || resultText === "🔄 Traduction en cours...") {
+    if (!resultText || resultText === "En attente de traduction..." || resultText === "🔄 Traduction en cours..." || resultText.includes("🔄 Traduction en cours")) {
         showTemporaryStatus("📭 Rien à copier", "error");
         return;
     }
@@ -399,16 +427,58 @@ function clearHistory() {
     }
 }
 
-// Vider le cache au clic sur l'info
-cacheInfo.addEventListener('click', async () => {
-    if (confirm("⚠️ Vider le cache peut nécessiter un rechargement du modèle. Continuer ?")) {
-        await clearModelCache();
-        showTemporaryStatus("🗑️ Cache vidé. Rechargez la page ou le modèle.", "success");
-        cacheInfo.style.display = 'none';
+// ---- Initialisation principale ----
+async function init() {
+    if (isLoading) return;
+    isLoading = true;
+    
+    initConfigPanel();
+    
+    try {
+        status.textContent = "⚙️ Chargement du modèle de traduction...";
+        status.className = "status loading";
+        
+        translator = await pipeline(MODEL_TASK, MODEL_ID, {
+            progress_callback: (progress) => {
+                if (progress.status === 'downloading') {
+                    status.textContent = `📥 Téléchargement: ${Math.round(progress.progress * 100)}%`;
+                } else if (progress.status === 'loading') {
+                    status.textContent = "⚙️ Chargement du modèle...";
+                }
+            }
+        });
+        
+        status.textContent = "✅ Modèle prêt !";
+        status.className = "status success";
+        translateBtn.disabled = false;
+        copyResultBtn.disabled = false;
+        reloadModelBtn.disabled = false;
+        
+        loadHistory();
+        
+        console.log("Modèle chargé avec succès");
+        console.log("Configuration de génération:", generationConfig);
+        
+        setTimeout(() => {
+            showCacheInfo();
+        }, 2000);
+        
+    } catch (e) {
+        status.textContent = "❌ Erreur : " + e.message;
+        status.className = "status error";
+        console.error("Erreur détaillée :", e);
+    } finally {
+        isLoading = false;
     }
-});
+}
 
-// Raccourcis clavier
+// Écouteurs d'événements
+translateBtn.addEventListener('click', translate);
+clearBtn.addEventListener('click', clearInput);
+copyResultBtn.addEventListener('click', copyResult);
+clearHistoryBtn.addEventListener('click', clearHistory);
+reloadModelBtn.addEventListener('click', reloadModel);
+
 inputText.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
@@ -418,12 +488,13 @@ inputText.addEventListener('keydown', (e) => {
 
 outputDiv.addEventListener('dblclick', copyResult);
 
-// Écouteurs d'événements
-translateBtn.addEventListener('click', translate);
-clearBtn.addEventListener('click', clearInput);
-copyResultBtn.addEventListener('click', copyResult);
-clearHistoryBtn.addEventListener('click', clearHistory);
-reloadModelBtn.addEventListener('click', reloadModel);
+cacheInfo.addEventListener('click', async () => {
+    if (confirm("⚠️ Vider le cache peut nécessiter un rechargement du modèle. Continuer ?")) {
+        await clearModelCache();
+        showTemporaryStatus("🗑️ Cache vidé. Rechargez la page ou le modèle.", "success");
+        cacheInfo.style.display = 'none';
+    }
+});
 
 // Démarrer l'application
 init();

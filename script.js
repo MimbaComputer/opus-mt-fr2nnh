@@ -34,7 +34,6 @@ let generationConfig = {
 	device: 'webgpu',
 	dtype: 'fp16'
 };
-};
 
 // Stockage de l'historique
 let history = [];

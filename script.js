@@ -1,7 +1,8 @@
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
 
 // Configuration
-//env.allowRemoteModels = false;
+env.allowRemoteModels = true;
+env.cacheDir = './models';  // Dossier de cache personnalisé
 
 // Éléments DOM
 const status = document.getElementById('status');
@@ -9,14 +10,17 @@ const translateBtn = document.getElementById('translateBtn');
 const clearBtn = document.getElementById('clearBtn');
 const copyResultBtn = document.getElementById('copyResultBtn');
 const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+const reloadModelBtn = document.getElementById('reloadModelBtn');
 const outputDiv = document.getElementById('output');
 const inputText = document.getElementById('inputText');
 const historyList = document.getElementById('historyList');
+const cacheInfo = document.getElementById('cacheInfo');
 
 // Configuration du modèle
-const modelID = "mimba/opus-mt-fr2nnh";
-const modelTask = "translation";
+const MODEL_ID = "mimba/opus-mt-fr2nnh";
+const MODEL_TASK = "translation";
 let translator = null;
+let isLoading = false;
 
 // Stockage de l'historique
 let history = [];
@@ -24,7 +28,146 @@ let history = [];
 // Clé pour le localStorage
 const STORAGE_KEY = 'translation_history';
 
-// ---- Gestion de l'historique ----
+// ---- Gestion du cache ----
+function getCacheSize() {
+    // Estimation approximative de la taille du cache
+    if ('caches' in window) {
+        return caches.keys().then(keys => {
+            let totalSize = 0;
+            return Promise.all(keys.map(key => 
+                caches.open(key).then(cache => 
+                    cache.keys().then(requests => 
+                        Promise.all(requests.map(req => 
+                            cache.match(req).then(res => res ? res.clone().blob().then(b => b.size) : 0)
+                        )).then(sizes => sizes.reduce((a,b) => a+b, 0))
+                    )
+                )
+            )).then(sizes => sizes.reduce((a,b) => a+b, 0));
+        });
+    }
+    return Promise.resolve(0);
+}
+
+async function clearModelCache() {
+    try {
+        status.textContent = "🗑️ Nettoyage du cache en cours...";
+        status.className = "status loading";
+        
+        // Vider le cache du modèle dans les différents stockages
+        if ('caches' in window) {
+            const cacheKeys = await caches.keys();
+            for (const key of cacheKeys) {
+                if (key.includes('transformers') || key.includes('model') || key.includes(MODEL_ID)) {
+                    await caches.delete(key);
+                    console.log(`Cache supprimé: ${key}`);
+                }
+            }
+        }
+        
+        // Nettoyer le localStorage du modèle
+        for (const key in localStorage) {
+            if (key.includes('transformers') || key.includes('model') || key.includes(MODEL_ID)) {
+                localStorage.removeItem(key);
+                console.log(`LocalStorage supprimé: ${key}`);
+            }
+        }
+        
+        // Nettoyer sessionStorage
+        for (const key in sessionStorage) {
+            if (key.includes('transformers') || key.includes('model') || key.includes(MODEL_ID)) {
+                sessionStorage.removeItem(key);
+                console.log(`SessionStorage supprimé: ${key}`);
+            }
+        }
+        
+        console.log("✅ Cache vidé");
+        return true;
+    } catch (e) {
+        console.error("Erreur nettoyage cache:", e);
+        return false;
+    }
+}
+
+// ---- Rechargement du modèle ----
+async function reloadModel() {
+    if (isLoading) {
+        status.textContent = "⚠️ Un chargement est déjà en cours...";
+        status.className = "status warning";
+        return;
+    }
+    
+    isLoading = true;
+    reloadModelBtn.disabled = true;
+    translateBtn.disabled = true;
+    copyResultBtn.disabled = true;
+    
+    status.textContent = "🔄 Nettoyage du cache et rechargement du modèle...";
+    status.className = "status loading";
+    
+    // 1. Vider le cache
+    const cacheCleared = await clearModelCache();
+    
+    if (cacheCleared) {
+        status.textContent = "🗑️ Cache vidé, téléchargement du nouveau modèle...";
+    }
+    
+    // 2. Forcer le rechargement en ajoutant un timestamp
+    const reloadModelId = MODEL_ID; // + `?reload=${Date.now()}`;
+    
+    try {
+        // Réinitialiser le pipeline
+        translator = null;
+        
+        // Recharger avec l'option de forcer le téléchargement
+        translator = await pipeline(MODEL_TASK, reloadModelId, {
+			local_files_only: false,
+            progress_callback: (progress) => {
+                if (progress.status === 'downloading') {
+                    status.textContent = `📥 Téléchargement: ${Math.round(progress.progress * 100)}%`;
+                } else if (progress.status === 'loading') {
+                    status.textContent = "⚙️ Chargement du modèle...";
+                }
+            }
+        });
+        
+        status.textContent = "✅ Modèle rechargé avec succès !";
+        status.className = "status success";
+        translateBtn.disabled = false;
+        copyResultBtn.disabled = false;
+        
+        // Afficher les infos du modèle
+        const model = translator.model;
+        console.log("Config du modèle rechargé:", model.config);
+        
+        // Afficher le message de cache après 3 secondes
+        setTimeout(() => {
+            showCacheInfo();
+        }, 3000);
+        
+    } catch (e) {
+        status.textContent = "❌ Erreur lors du rechargement : " + e.message;
+        status.className = "status error";
+        console.error("Erreur rechargement:", e);
+    } finally {
+        isLoading = false;
+        reloadModelBtn.disabled = false;
+    }
+}
+
+async function showCacheInfo() {
+    try {
+        const size = await getCacheSize();
+        if (size > 0) {
+            const sizeMB = (size / (1024 * 1024)).toFixed(2);
+            cacheInfo.style.display = 'block';
+            cacheInfo.title = `Taille du cache: ${sizeMB} MB - Cliquer pour vider`;
+        }
+    } catch (e) {
+        console.error("Erreur lecture cache:", e);
+    }
+}
+
+// ---- Gestion de l'historique (inchangée) ----
 function loadHistory() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -38,7 +181,7 @@ function loadHistory() {
 }
 
 function saveHistory() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-50))); // Garde les 50 derniers
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-50)));
 }
 
 function addToHistory(source, target) {
@@ -51,7 +194,6 @@ function addToHistory(source, target) {
         timestamp: new Date().toLocaleString()
     });
     
-    // Limiter à 100 entrées
     if (history.length > 100) history.pop();
     
     saveHistory();
@@ -77,12 +219,10 @@ function renderHistory() {
         </div>
     `).join('');
     
-    // Ajouter les écouteurs d'événements
     document.querySelectorAll('.use-source').forEach(btn => {
         btn.addEventListener('click', () => {
             const source = btn.getAttribute('data-source');
             inputText.value = source;
-            updateCharCount();
         });
     });
     
@@ -116,20 +256,16 @@ async function copyToClipboard(text) {
     }
 }
 
-function updateCharCount() {
-    // Optionnel : ajouter un compteur de caractères
-}
-
 function showTemporaryStatus(message, type = 'info') {
     const originalText = status.textContent;
     const originalClass = status.className;
     status.textContent = message;
     status.className = `status ${type}`;
     setTimeout(() => {
-        if (translator) {
+        if (translator && !isLoading) {
             status.textContent = originalText;
             status.className = originalClass;
-        } else {
+        } else if (translator) {
             status.textContent = 'Modèle prêt';
             status.className = 'status success';
         }
@@ -138,30 +274,45 @@ function showTemporaryStatus(message, type = 'info') {
 
 // ---- Initialisation ----
 async function init() {
+    if (isLoading) return;
+    isLoading = true;
+    
     try {
         status.textContent = "⚙️ Chargement du modèle de traduction...";
         status.className = "status loading";
         
-        translator = await pipeline(modelTask, modelID);
-        //translator = await pipeline(modelTask, modelID, { local_files_only: true });
+        translator = await pipeline(MODEL_TASK, MODEL_ID, {
+            progress_callback: (progress) => {
+                if (progress.status === 'downloading') {
+                    status.textContent = `📥 Téléchargement: ${Math.round(progress.progress * 100)}%`;
+                } else if (progress.status === 'loading') {
+                    status.textContent = "⚙️ Chargement du modèle...";
+                }
+            }
+        });
         
         status.textContent = "✅ Modèle prêt !";
         status.className = "status success";
         translateBtn.disabled = false;
         copyResultBtn.disabled = false;
+        reloadModelBtn.disabled = false;
         
-        // Charger l'historique
         loadHistory();
         
-        // Afficher les infos du modèle
         const model = translator.model;
         console.log("Config du modèle:", model.config);
+        
+        setTimeout(() => {
+            showCacheInfo();
+        }, 2000);
         
     } catch (e) {
         status.textContent = "❌ Erreur : " + e.message;
         status.className = "status error";
         console.error("Erreur détaillée :", e);
         console.error("Stack:", e.stack);
+    } finally {
+        isLoading = false;
     }
 }
 
@@ -194,24 +345,19 @@ async function translate() {
                          result?.[0]?.text?.trim() ??
                          "";
         
-        // Nettoyage amélioré
         translation = translation
-            .replace(/__nnh__/g, '')  // Enlever les marqueurs de langue
-            .replace(/^,\s*/, '')      // Enlever la virgule au début
-            .replace(/^\s+/, '')       // Enlever les espaces au début
-            .replace(/^[，,]\s*/, '')  // Enlever virgule chinoise ou normale
+            .replace(/__nnh__/g, '')
+            .replace(/^,\s*/, '')
+            .replace(/^\s+/, '')
+            .replace(/^[，,]\s*/, '')
             .trim();
         
-        // Si la traduction commence par un espace ou une virgule après nettoyage
         if (translation.startsWith(',')) {
             translation = translation.substring(1).trim();
         }
         
         outputDiv.textContent = translation;
-        
-        // Ajouter à l'historique
         addToHistory(text, translation);
-        
         showTemporaryStatus("✅ Traduction terminée !", "success");
         
     } catch (err) {
@@ -223,7 +369,6 @@ async function translate() {
     }
 }
 
-// ---- Copier le résultat ----
 async function copyResult() {
     const resultText = outputDiv.textContent;
     if (!resultText || resultText === "En attente de traduction..." || resultText === "🔄 Traduction en cours...") {
@@ -239,14 +384,12 @@ async function copyResult() {
     }
 }
 
-// ---- Effacer le champ de saisie ----
 function clearInput() {
     inputText.value = "";
     outputDiv.textContent = "En attente de traduction...";
     showTemporaryStatus("🗑️ Champ effacé", "success");
 }
 
-// ---- Effacer tout l'historique ----
 function clearHistory() {
     if (confirm("⚠️ Voulez-vous vraiment effacer tout l'historique des traductions ?")) {
         history = [];
@@ -256,23 +399,31 @@ function clearHistory() {
     }
 }
 
-// ---- Raccourcis clavier ----
+// Vider le cache au clic sur l'info
+cacheInfo.addEventListener('click', async () => {
+    if (confirm("⚠️ Vider le cache peut nécessiter un rechargement du modèle. Continuer ?")) {
+        await clearModelCache();
+        showTemporaryStatus("🗑️ Cache vidé. Rechargez la page ou le modèle.", "success");
+        cacheInfo.style.display = 'none';
+    }
+});
+
+// Raccourcis clavier
 inputText.addEventListener('keydown', (e) => {
-    // Ctrl+Enter pour traduire
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         translate();
     }
 });
 
-// Double-clic sur le résultat pour copier
 outputDiv.addEventListener('dblclick', copyResult);
 
-// ---- Écouteurs d'événements ----
+// Écouteurs d'événements
 translateBtn.addEventListener('click', translate);
 clearBtn.addEventListener('click', clearInput);
 copyResultBtn.addEventListener('click', copyResult);
 clearHistoryBtn.addEventListener('click', clearHistory);
+reloadModelBtn.addEventListener('click', reloadModel);
 
-// ---- Démarrer l'application ----
+// Démarrer l'application
 init();

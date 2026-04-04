@@ -92,6 +92,7 @@
             display: flex;
             gap: 15px;
             margin: 20px 0;
+            flex-wrap: wrap;
         }
 
         button {
@@ -123,6 +124,22 @@
 
         .btn-secondary:hover {
             background: #e0e0e0;
+        }
+
+        .btn-reload {
+            background: #ff9800;
+            color: white;
+            flex: 1;
+        }
+
+        .btn-reload:hover {
+            background: #f57c00;
+            transform: translateY(-2px);
+        }
+
+        .btn-reload:disabled {
+            background: #ffcc80;
+            cursor: not-allowed;
         }
 
         button:disabled {
@@ -174,6 +191,11 @@
             color: #c62828;
         }
 
+        .status.warning {
+            background: #fff3e0;
+            color: #ef6c00;
+        }
+
         /* Panneau droit - Historique */
         .history-panel {
             background: white;
@@ -193,6 +215,8 @@
             margin-bottom: 20px;
             padding-bottom: 10px;
             border-bottom: 2px solid #667eea;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .history-header h3 {
@@ -281,6 +305,19 @@
             opacity: 0.8;
         }
 
+        /* Cache info */
+        .cache-info {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 10px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .cache-info:hover {
+            color: #333;
+        }
+
         /* Responsive */
         @media (max-width: 900px) {
             .main-content {
@@ -314,6 +351,7 @@
                 <div class="button-group">
                     <button id="translateBtn" class="btn-primary" disabled>✨ Traduire</button>
                     <button id="clearBtn" class="btn-secondary">🗑️ Effacer</button>
+                    <button id="reloadModelBtn" class="btn-reload" title="Recharger le modèle et vider le cache">🔄 Recharger</button>
                 </div>
 
                 <div class="panel-title">🎯 Traduction</div>
@@ -324,6 +362,7 @@
                 </div>
 
                 <div id="status" class="status loading">⚙️ Chargement du modèle en cours...</div>
+                <div id="cacheInfo" class="cache-info" style="display: none;">🗑️ Cliquer pour vider le cache</div>
             </div>
 
             <!-- Panneau droit : Historique -->
@@ -340,6 +379,7 @@
 
         <div class="footer">
             <p>💡 Astuce : Cliquez sur une traduction dans l'historique pour la recopier dans le champ source | Double-cliquez sur le résultat pour le copier</p>
+            <p>🔄 Le bouton "Recharger" force le téléchargement d'une nouvelle version du modèle</p>
         </div>
     </div>
 

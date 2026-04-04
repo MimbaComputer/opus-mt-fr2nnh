@@ -22,15 +22,18 @@ const MODEL_TASK = "translation";
 let translator = null;
 let isLoading = false;
 
-// Configuration de génération
+// Configuration de génération 
 let generationConfig = {
-    num_beams: 4,
+    num_beams: 1,
     max_new_tokens: 512,
     return_full_text: false,
     early_stopping: false,
     no_repeat_ngram_size: 0,
     temperature: 1.0,
-    do_sample: false
+    do_sample: false,
+	device: 'webgpu',
+	dtype: 'fp16'
+};
 };
 
 // Stockage de l'historique
